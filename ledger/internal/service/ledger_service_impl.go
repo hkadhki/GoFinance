@@ -33,9 +33,6 @@ func (l *ledgerServiceImpl) GetReportSummary(
 	to time.Time,
 ) ([]domain.ReportSummary, error) {
 
-	stopHeartbeat := startReportHeartbeat(ctx)
-	defer stopHeartbeat()
-
 	userID, err := UserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -300,6 +297,7 @@ func (l *ledgerServiceImpl) ListBudgets(
 				data,
 				15*time.Second,
 			).Err()
+			log.Println("CACHE SET:", cacheKey)
 		}
 	}
 
