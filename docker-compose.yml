@@ -1,0 +1,94 @@
+services:
+  postgres-ledger:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ledger
+    volumes:
+      - ledger_db:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  postgres-auth:
+    image: postgres:16-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: auth
+    volumes:
+      - auth_db:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  ledger:
+    build: ./ledger
+    ports:
+      - "50051:50051"
+    environment:
+      DATABASE_URL: "postgres://postgres:postgres@postgres-ledger:5432/ledger?sslmode=disable"
+      REDIS_ADDR: "redis:6379"
+      GRPC_PORT: "50051"
+    depends_on:
+      - postgres-ledger
+      - redis
+    networks:
+      - app-network
+
+  auth:
+    build: ./auth
+    ports:
+      - "50052:50052"
+    environment:
+      DATABASE_URL: "postgres://postgres:postgres@postgres-auth:5432/auth?sslmode=disable"
+      GRPC_PORT: "50052"
+      JWT_SECRET: "dev-secret"
+    depends_on:
+      - postgres-auth
+    networks:
+      - app-network
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:8080"
+    environment:
+      LEDGER_ADDR: "ledger:50051"
+      AUTH_ADDR: "auth:50052"
+      HTTP_PORT: "8080"
+    depends_on:
+      - ledger
+      - auth
+    networks:
+      - app-network
+
+  tuna:
+    image: yuccastream/tuna:latest
+    container_name: tuna
+    command: http gateway:8080
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    environment:
+      TUNA_TOKEN: tt_71t7ad75vznnkr777vj8qvehs3rcbd2i
+    networks:
+      - app-network
+
+
+
+volumes:
+  ledger_db:
+  auth_db:
+
+networks:
+  app-network:
+    driver: bridge

@@ -1,0 +1,21 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "HTTP Gateway for personal finance microservices",
+        "title": "GoFinance Gateway API",
+        "contact": {
+            "name": "GoFinance"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {},
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

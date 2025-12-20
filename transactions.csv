@@ -1,0 +1,5 @@
+amount,category,description,date
+10.50,food3,coffee,2025-09-10
+25.00,food3,bus,2025-09-10
+-5,food3,invalid,2025-09-10
+90.00,food3,almost limit,2025-09-10

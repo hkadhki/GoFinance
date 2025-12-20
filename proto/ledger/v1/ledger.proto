@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package ledger.v1;
+
+option go_package = "ledger/ledgerpb;ledgerpb";
+
+import "google/protobuf/empty.proto";
+
+message Transaction {
+  double amount = 1;
+  string category = 2;
+  string description = 3;
+  string date = 4; // YYYY-MM-DD
+}
+
+message Budget {
+  string category = 1;
+  double limit = 2;
+  string period = 3;
+}
+
+message CreateTransactionRequest {
+  double amount = 1;
+  string category = 2;
+  string description = 3;
+  string date = 4; // YYYY-MM-DD
+}
+
+message CreateBudgetRequest {
+  string category = 1;
+  double limit = 2;
+  string period = 3;
+}
+
+message ListTransactionsResponse {
+  repeated Transaction transactions = 1;
+}
+
+message ListBudgetsResponse {
+  repeated Budget budgets = 1;
+}
+
+message ReportSummaryRequest {
+  string from = 1; // YYYY-MM-DD
+  string to = 2;   // YYYY-MM-DD
+}
+
+message ReportSummaryResponse {
+  // key = category, value = total amount
+  map<string, double> totals = 1;
+}
+
+message BulkAddTransactionsRequest {
+  repeated CreateTransactionRequest transactions = 1;
+  int32 workers = 2;
+}
+
+message BulkError {
+  int32 index = 1;
+  string error = 2;
+}
+
+message BulkAddTransactionsResponse {
+  int64 accepted = 1;
+  int64 rejected = 2;
+  repeated BulkError errors = 3;
+}
+
+
+
+service LedgerService {
+  rpc AddTransaction(CreateTransactionRequest) returns (Transaction);
+  rpc ListTransactions(google.protobuf.Empty) returns (ListTransactionsResponse);
+  rpc SetBudget(CreateBudgetRequest) returns (Budget);
+  rpc ListBudgets(google.protobuf.Empty) returns (ListBudgetsResponse);
+  rpc GetReportSummary(ReportSummaryRequest) returns (ReportSummaryResponse);
+  rpc BulkAddTransactions(BulkAddTransactionsRequest) returns (BulkAddTransactionsResponse);
+}
