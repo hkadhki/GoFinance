@@ -13,10 +13,10 @@ import (
 
 type Server struct {
 	authv1.UnimplementedAuthServiceServer
-	auth *service.AuthService
+	auth service.Auth
 }
 
-func New(authService *service.AuthService) *Server {
+func New(authService service.Auth) *Server {
 	return &Server{
 		auth: authService,
 	}

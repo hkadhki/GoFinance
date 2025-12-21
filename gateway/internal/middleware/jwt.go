@@ -29,7 +29,7 @@ func NewJWT(client authv1.AuthServiceClient) func(next http.Handler) http.Handle
 			}
 
 			tokenStr := parts[1]
-			
+
 			resp, err := client.Validate(
 				r.Context(),
 				&authv1.ValidateRequest{
