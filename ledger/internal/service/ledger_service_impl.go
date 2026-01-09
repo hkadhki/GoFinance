@@ -17,6 +17,7 @@ import (
 )
 
 type ledgerServiceImpl struct {
+	cache    cache.Cache
 	budgets  domain.BudgetRepository
 	expenses domain.ExpenseRepository
 	reports  domain.ReportRepository
@@ -45,14 +46,11 @@ func (l *ledgerServiceImpl) GetReportSummary(
 		to.Format("2006-01-02"),
 	)
 
-	if cache.Client != nil {
-		data, err := cache.Client.Get(ctx, cacheKey).Bytes()
-		if err == nil {
-			var cached []domain.ReportSummary
-			if err := json.Unmarshal(data, &cached); err == nil {
-				log.Println("CACHE HIT:", cacheKey)
-				return cached, nil
-			}
+	if data, ok := l.cache.Get(ctx, cacheKey); ok {
+		var cached []domain.ReportSummary
+		if err := json.Unmarshal(data, &cached); err == nil {
+			log.Println("CACHE HIT:", cacheKey)
+			return cached, nil
 		}
 	}
 
@@ -101,17 +99,8 @@ func (l *ledgerServiceImpl) GetReportSummary(
 		result = append(result, r)
 	}
 
-	if cache.Client != nil {
-		if data, err := json.Marshal(result); err == nil {
-			_ = cache.Client.Set(
-				ctx,
-				cacheKey,
-				data,
-				30*time.Second,
-			).Err()
-
-			log.Println("CACHE SET:", cacheKey)
-		}
+	if data, err := json.Marshal(result); err == nil {
+		l.cache.Set(ctx, cacheKey, data, 15*time.Second)
 	}
 
 	return result, nil
@@ -175,7 +164,7 @@ func (l *ledgerServiceImpl) AddTransaction(
 		return err
 	}
 
-	invalidateReportCache(ctx, userID)
+	l.invalidateReportCache(ctx, userID)
 	return nil
 }
 
@@ -254,8 +243,8 @@ func (l *ledgerServiceImpl) SetBudget(
 		return err
 	}
 
-	invalidateReportCache(ctx, userID)
-	invalidateBudgetsCache(ctx, userID)
+	l.invalidateReportCache(ctx, userID)
+	l.invalidateBudgetsCache(ctx, userID)
 
 	return nil
 }
@@ -271,14 +260,11 @@ func (l *ledgerServiceImpl) ListBudgets(
 
 	cacheKey := fmt.Sprintf("budgets:all:%s", userID)
 
-	if cache.Client != nil {
-		data, err := cache.Client.Get(ctx, cacheKey).Bytes()
-		if err == nil {
-			var cached []domain.Budget
-			if err := json.Unmarshal(data, &cached); err == nil {
-				log.Println("CACHE HIT:", cacheKey)
-				return cached, nil
-			}
+	if data, ok := l.cache.Get(ctx, cacheKey); ok {
+		var cached []domain.Budget
+		if err := json.Unmarshal(data, &cached); err == nil {
+			log.Println("CACHE HIT:", cacheKey)
+			return cached, nil
 		}
 	}
 
@@ -289,16 +275,9 @@ func (l *ledgerServiceImpl) ListBudgets(
 		return nil, err
 	}
 
-	if cache.Client != nil {
-		if data, err := json.Marshal(res); err == nil {
-			_ = cache.Client.Set(
-				ctx,
-				cacheKey,
-				data,
-				15*time.Second,
-			).Err()
-			log.Println("CACHE SET:", cacheKey)
-		}
+	if data, err := json.Marshal(res); err == nil {
+		l.cache.Set(ctx, cacheKey, data, 15*time.Second)
+		log.Println("CACHE SET:", cacheKey)
 	}
 
 	return res, nil
@@ -359,7 +338,7 @@ func (l *ledgerServiceImpl) BulkAddTransactions(
 
 	wg.Wait()
 
-	invalidateReportCache(ctx, userID)
+	l.invalidateReportCache(ctx, userID)
 
 	return &domain.BulkImportResult{
 		Accepted: accepted,
@@ -369,11 +348,13 @@ func (l *ledgerServiceImpl) BulkAddTransactions(
 }
 
 func New(
+	c cache.Cache,
 	b domain.BudgetRepository,
 	e domain.ExpenseRepository,
 	r domain.ReportRepository,
 ) LedgerService {
 	return &ledgerServiceImpl{
+		cache:    c,
 		budgets:  b,
 		expenses: e,
 		reports:  r,
@@ -428,28 +409,18 @@ func UserIDFromContext(ctx context.Context) (uuid.UUID, error) {
 	return userID, nil
 }
 
-func invalidateReportCache(ctx context.Context, userID uuid.UUID) {
-	if cache.Client == nil {
-		return
-	}
-
+func (l *ledgerServiceImpl) invalidateReportCache(
+	ctx context.Context,
+	userID uuid.UUID,
+) {
 	pattern := fmt.Sprintf("report:summary:%s:*", userID.String())
-
-	iter := cache.Client.Scan(ctx, 0, pattern, 0).Iterator()
-	for iter.Next(ctx) {
-		_ = cache.Client.Del(ctx, iter.Val()).Err()
-	}
-
-	if err := iter.Err(); err != nil {
-		log.Printf("cache scan error: %v", err)
-	}
+	l.cache.DeleteByPattern(ctx, pattern)
 }
 
-func invalidateBudgetsCache(ctx context.Context, userID uuid.UUID) {
-	if cache.Client == nil {
-		return
-	}
-
+func (l *ledgerServiceImpl) invalidateBudgetsCache(
+	ctx context.Context,
+	userID uuid.UUID,
+) {
 	key := fmt.Sprintf("budgets:all:%s", userID.String())
-	_ = cache.Client.Del(ctx, key).Err()
+	l.cache.Delete(ctx, key)
 }

@@ -5,34 +5,29 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 var Client *redis.Client
 
-func Init(ctx context.Context) {
-	addr := getenv("REDIS_ADDR", "localhost:6379")
-	pass := os.Getenv("REDIS_PASSWORD")
-	dbNum := getenvInt("REDIS_DB", 0)
+var Default Cache
 
-	Client = redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: pass,
-		DB:       dbNum,
+func InitCache(ctx context.Context) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     getenv("REDIS_ADDR", "localhost:6379"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       getenvInt("REDIS_DB", 0),
 	})
 
-	ctxPing, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	if err := Client.Ping(ctxPing).Err(); err != nil {
-		log.Printf("redis disabled: %v", err)
-		Client = nil
+	if err := client.Ping(ctx).Err(); err != nil {
+		log.Println("redis disabled:", err)
+		Default = NewNoCache()
 		return
 	}
 
 	log.Println("Redis connected")
+	Default = NewCache(client)
 }
 
 func getenv(key, def string) string {

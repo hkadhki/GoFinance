@@ -44,13 +44,14 @@ func main() {
 		}
 	}
 
-	cache.Init(ctx)
+	cache.InitCache(ctx)
 	q := sqlc.New(database)
 	budgetRepo := pg.NewBudgetRepo(q)
 	expenseRepo := pg.NewExpenseRepo(q)
 	reportRepo := pg.NewReportRepo(q)
 
 	svc := service.New(
+		cache.Default,
 		budgetRepo,
 		expenseRepo,
 		reportRepo,
